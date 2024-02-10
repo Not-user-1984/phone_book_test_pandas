@@ -4,97 +4,64 @@ import pandas as pd
 
 class PhoneBook:
     def __init__(self, filename: str) -> None:
-        """
-        Инициализация объекта PhoneBook.
-
-        Параметры:
-        - filename (str): Имя файла для сохранения/загрузки данных.
-        """
         self.filename: str = filename
         self.data: pd.DataFrame = None
         self.load_data()
 
     def load_data(self) -> None:
-        """
-        Загрузка данных из файла, если файл существует, или создание нового DataFrame.
-        """
         if pd.read_csv(self.filename).empty:
             self.data = pd.DataFrame(columns=["Фамилия", "Имя", "Отчество", "Организация", "Рабочий телефон", "Личный телефон"])
         else:
             self.data = pd.read_csv(self.filename)
 
     def save_data(self) -> None:
-        """
-        Сохранение данных в файл CSV.
-        """
         self.data.to_csv(self.filename, index=False)
 
     def display_page(self, page_num: int, page_size: int = 5) -> None:
-        """
-        Вывод страницы записей справочника.
-
-        Параметры:
-        - page_num (int): Номер страницы.
-        - page_size (int): Размер страницы (по умолчанию 5 записей).
-        """
         start_idx: int = page_num * page_size
         end_idx: int = (page_num + 1) * page_size
         page_data: pd.DataFrame = self.data.iloc[start_idx:end_idx]
         print(page_data)
 
     def add_entry(self, entry: Dict[str, Any]) -> None:
-        """
-        Добавление новой записи в справочник.
-
-        Параметры:
-        - entry (Dict[str, Any]): Словарь с данными для новой записи.
-        """
-        self.data = pd.concat([self.data, pd.DataFrame([entry])], ignore_index=True)
-        self.save_data()
+        if self.validate_phone_number(entry["Рабочий телефон"]) and self.validate_phone_number(entry["Личный телефон"]):
+            self.data = pd.concat([self.data, pd.DataFrame([entry])], ignore_index=True)
+            self.save_data()
+        else:
+            print("Некорректные номера телефонов. Номер должен содержать только цифры и быть не длиннее 100 символов.")
 
     def edit_entry(self, index: int, new_entry: Dict[str, Any]) -> None:
+        if self.validate_phone_number(new_entry["Рабочий телефон"]) and self.validate_phone_number(new_entry["Личный телефон"]):
+            self.data.loc[index] = new_entry
+            self.save_data()
+        else:
+            print("Некорректные номера телефонов. Номер должен содержать только цифры и быть не длиннее 100 символов.")
+
+    def validate_phone_number(self, number: str) -> bool:
         """
-        Редактирование записи в справочнике.
+        Проверка номера телефона на корректность.
 
         Параметры:
-        - index (int): Индекс записи для редактирования.
-        - new_entry (Dict[str, Any]): Словарь с новыми данными для записи.
-        """
-        self.data.loc[index] = new_entry
-        self.save_data()
-
-    def search(self, **kwargs: str) -> pd.DataFrame:
-        """
-        Поиск записей в справочнике по заданным критериям.
-
-        Параметры:
-        - **kwargs (str): Ключевые аргументы для поиска.
+        - number (str): Номер телефона.
 
         Возвращает:
-        - pd.DataFrame: DataFrame с найденными записями.
+        - bool: True, если номер корректен, False в противном случае.
         """
-        query: pd.Series = pd.Series(kwargs)
-        results: pd.DataFrame = self.data.copy()
-        for key, value in query.items():
-            if value:
-                results = results[results[key] == value]
-        return results
+        return number.isdigit() and len(number) <= 100
+
+    def search(self, field: str, value: str) -> pd.DataFrame:
+        if field in self.data.columns:
+            return self.data[self.data[field] == value]
+        else:
+            print("Неверное поле для поиска.")
+            return pd.DataFrame()
 
 
 class PhoneBookInterface:
     def __init__(self, phonebook: PhoneBook) -> None:
-        """
-        Инициализация объекта PhoneBookInterface.
-
-        Параметры:
-        - phonebook (PhoneBook): Объект PhoneBook для работы с данными.
-        """
         self.phonebook: PhoneBook = phonebook
 
     def display_menu(self) -> None:
-        """
-        Вывод меню интерфейса.
-        """
         print("\nТелефонный справочник:")
         print("1. Показать записи")
         print("2. Добавить запись")
@@ -102,10 +69,26 @@ class PhoneBookInterface:
         print("4. Поиск записей")
         print("5. Выход")
 
+    def display_search_menu(self) -> str:
+        print("Выберите поле для поиска:")
+        print("1. Фамилия")
+        print("2. Имя")
+        print("3. Отчество")
+        print("4. Организация")
+        print("5. Рабочий телефон")
+        print("6. Личный телефон")
+        choice = input("Выберите поле: ")
+        fields = {
+            "1": "Фамилия",
+            "2": "Имя",
+            "3": "Отчество",
+            "4": "Организация",
+            "5": "Рабочий телефон",
+            "6": "Личный телефон"
+        }
+        return fields.get(choice, None)
+
     def run(self) -> None:
-        """
-        Запуск интерфейса справочника.
-        """
         while True:
             self.display_menu()
             choice: str = input("Выберите действие: ")
@@ -136,15 +119,13 @@ class PhoneBookInterface:
                 self.phonebook.edit_entry(index, new_entry)
                 print("Запись отредактирована.")
             elif choice == "4":
-                search_criteria: Dict[str, str] = {}
-                search_criteria["Фамилия"] = input("Введите фамилию (пусто для игнорирования): ")
-                search_criteria["Имя"] = input("Введите имя (пусто для игнорирования): ")
-                search_criteria["Отчество"] = input("Введите отчество (пусто для игнорирования): ")
-                search_criteria["Организация"] = input("Введите название организации (пусто для игнорирования): ")
-                search_criteria["Рабочий телефон"] = input("Введите рабочий телефон (пусто для игнорирования): ")
-                search_criteria["Личный телефон"] = input("Введите личный телефон (пусто для игнорирования): ")
-                results: pd.DataFrame = self.phonebook.search(**search_criteria)
-                print(results)
+                field = self.display_search_menu()
+                if field:
+                    value = input(f"Введите значение для поля '{field}': ")
+                    results: pd.DataFrame = self.phonebook.search(field, value)
+                    print(results)
+                else:
+                    print("Неверный выбор поля.")
             elif choice == "5":
                 print("Выход.")
                 break
@@ -153,9 +134,6 @@ class PhoneBookInterface:
 
 
 def main() -> None:
-    """
-    Основная функция для запуска программы.
-    """
     filename: str = "phonebook.csv"
     phonebook: PhoneBook = PhoneBook(filename)
     interface: PhoneBookInterface = PhoneBookInterface(phonebook)
